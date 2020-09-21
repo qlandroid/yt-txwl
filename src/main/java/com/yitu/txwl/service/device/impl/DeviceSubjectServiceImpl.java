@@ -112,8 +112,19 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
         list.forEach(e -> {
             OpodDevices opodDevices = getOpodByDeviceId(e.getDeviceId());
             e.setName(opodDevices.getName());
-            log.debug("OpodDevices---> {}", opodDevices);
+            log.info("更新OpodDevices---> {}", opodDevices);
             // redisUtil.zSSet("HOUR" + key, e, e.getFaceSubjectNum().doubleValue());
+
+            // 如果当前时间为0点之后，则当前人数为总人数减去上一小时的总人数
+            if (key > 0) {
+                int lastHour = key - 1;
+                DeviceSubject sub = (DeviceSubject)redisUtil.get(lastHour + "_" + e.getId());
+                if (null != sub) {
+                    int num = e.getFaceSubjectNum() - sub.getFaceSubjectNum();
+                    e.setFaceHourNum(Math.max(num, 0));
+                }
+            }
+
             // 缓存当前摄像头人数，key:当前小时数_摄像头ObjectId
             redisUtil.set(key + "_" + e.getId(), e);
         });
@@ -121,6 +132,7 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
 
     /**
      * 获取摄像头数据
+     * 并缓存摄像头加密解密数据
      */
     private OpodDevices getOpodByDeviceId(String deviceId) {
         OpodDevices opodDevices = null;

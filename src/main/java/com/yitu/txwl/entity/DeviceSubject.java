@@ -1,6 +1,5 @@
 package com.yitu.txwl.entity;
 
-import org.bson.types.ObjectId;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
@@ -28,8 +27,11 @@ public class DeviceSubject {
     private Integer araeId;
     @Field("area_name")
     private String areaName;
+    /** 总人数 */
     @Field("face_subject_num")
     private Integer faceSubjectNum;
+    /** 当前小时人数 */
+    private Integer faceHourNum;
     /** 摄像头名称 */
     private String name;
 
@@ -87,6 +89,14 @@ public class DeviceSubject {
 
     public void setFaceSubjectNum(Integer faceSubjectNum) {
         this.faceSubjectNum = faceSubjectNum;
+    }
+
+    public Integer getFaceHourNum() {
+        return faceHourNum;
+    }
+
+    public void setFaceHourNum(Integer faceHourNum) {
+        this.faceHourNum = faceHourNum;
     }
 
     @Override
