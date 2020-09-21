@@ -36,5 +36,5 @@ public interface DeviceSubjectService {
      * @author WJ
      * @date   2020-09-21 15:58:59
      */
-    LinkedHashMap<String, List<AreaDeviceSubject>> listAllAreaStatistics();
+    LinkedHashMap<String, List<AreaDeviceSubject>> listAllAreaStatistics(String areaId);
 }

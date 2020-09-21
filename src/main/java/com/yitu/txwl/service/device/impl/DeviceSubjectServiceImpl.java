@@ -16,6 +16,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -55,11 +56,11 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
     }
 
     @Override
-    public LinkedHashMap<String, List<AreaDeviceSubject>> listAllAreaStatistics() {
+    public LinkedHashMap<String, List<AreaDeviceSubject>> listAllAreaStatistics(String areaId) {
         LocalDateTime now = LocalDateTime.now();
         int hour = now.getHour();
         // 获取所有区域人数摄像头
-        List<AreaDeviceSubject> list = listAllAreaDevice();
+        List<AreaDeviceSubject> list = listAllAreaDevice(areaId);
         return listAllAreaFiveVerticalData(hour, list);
     }
 
@@ -87,11 +88,16 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
     /**
      * 从mongo中获取所有区域摄像头人数
      */
-    private List<AreaDeviceSubject> listAllAreaDevice() {
+    private List<AreaDeviceSubject> listAllAreaDevice(String areaId) {
         int hour = LocalDateTime.now().getHour();
         Query query = new Query();
         Criteria criteria = Criteria.where("date").is(LocalDate.now().toString());
-        query.addCriteria(criteria);
+        if (!StringUtils.isEmpty(areaId)) {
+            // 如果传入区域ID则根据区域ID查询
+            criteria.and("_id").is(areaId);
+        }
+        query.addCriteria(criteria)
+                .with(Sort.by(Sort.Order.desc("area_id")));
         List<AreaDeviceSubject> list = mongotemplate.find(query, AreaDeviceSubject.class);
         list.forEach(e -> {
             // 根据总抓拍人数计算当前小时抓拍人数
@@ -116,7 +122,8 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
             } else {
                 List<DeviceSubject> dataList = new ArrayList<>();
                 list.forEach(e -> {
-                    String key = x.contains(spiltStr) ? x.split("-")[1] : x;
+                    /* 假如是12-14，则查询13_device_id的缓存数据 */
+                    String key = x.contains(spiltStr) ? String.valueOf((Integer.parseInt(x.split("-")[0]) + 1)) : x;
                     DeviceSubject deviceSubject = (DeviceSubject) redisUtil.get(key + "_device_" + e.getId());
                     dataList.add(deviceSubject);
                 });
@@ -144,7 +151,8 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
             } else {
                 List<AreaDeviceSubject> dataList = new ArrayList<>();
                 list.forEach(e -> {
-                    String key = x.contains(spiltStr) ? x.split("-")[1] : x;
+                    /* 假如是12-14，则查询13_area_id的缓存数据 */
+                    String key = x.contains(spiltStr) ? String.valueOf((Integer.parseInt(x.split("-")[0]) + 1)) : x;
                     AreaDeviceSubject deviceSubject = (AreaDeviceSubject) redisUtil.get(key + "_area_" + e.getId());
                     dataList.add(deviceSubject);
                 });
@@ -186,7 +194,8 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
         // 区域摄像头
         Query areaQuery = new Query();
         Criteria criteria = Criteria.where("date").is(LocalDate.now().toString());
-        areaQuery.addCriteria(criteria);
+        areaQuery.addCriteria(criteria)
+                .with(Sort.by(Sort.Order.desc("area_id")));
         List<AreaDeviceSubject> areaList = mongotemplate.find(areaQuery, AreaDeviceSubject.class);
         areaList.forEach(e -> {
             // 根据总抓拍人数计算当前小时抓拍人数

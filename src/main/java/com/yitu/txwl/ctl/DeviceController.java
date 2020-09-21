@@ -55,8 +55,8 @@ public class DeviceController {
      * @date   2020-09-19 22:25:05
      */
     @GetMapping("/allAreaStatistics")
-    public HashMap<String, List<AreaDeviceSubject>> listAllAreaStatistics() {
-        return deviceSubjectService.listAllAreaStatistics();
+    public HashMap<String, List<AreaDeviceSubject>> listAllAreaStatistics(String areaId) {
+        return deviceSubjectService.listAllAreaStatistics(areaId);
     }
 
     @PostMapping("/update")
