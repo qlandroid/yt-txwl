@@ -2,6 +2,7 @@ package com.yitu.txwl.service.device.impl;
 
 import com.alibaba.fastjson.JSONObject;
 import com.yitu.txwl.core.util.RedisUtil;
+import com.yitu.txwl.entity.AreaDeviceSubject;
 import com.yitu.txwl.entity.DeviceSubject;
 import com.yitu.txwl.entity.OpodDevices;
 import com.yitu.txwl.service.device.DeviceSubjectService;
@@ -16,8 +17,12 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -44,16 +49,25 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
         int hour = now.getHour();
         List<DeviceSubject> list;
         // 获取排名前4人数摄像头
-        list = listTop4Device();
+        list = listTop4Device(hour);
         // 根据4个摄像头获取摄像头的前5个纵轴的数据
         return listFiveVerticalData(hour, list);
+    }
+
+    @Override
+    public LinkedHashMap<String, List<AreaDeviceSubject>> listAllAreaStatistics() {
+        LocalDateTime now = LocalDateTime.now();
+        int hour = now.getHour();
+        // 获取所有区域人数摄像头
+        List<AreaDeviceSubject> list = listAllAreaDevice();
+        return listAllAreaFiveVerticalData(hour, list);
     }
 
     /**
      * 从mongo中获取排名前4人数摄像头
      */
-    private List<DeviceSubject> listTop4Device() {
-        int hour = LocalDateTime.now().getHour();
+    private List<DeviceSubject> listTop4Device(int hour) {
+        // int hour = LocalDateTime.now().getHour();
         Query query = new Query();
         Criteria criteria = new Criteria();
         // 获取排名前4入口人数
@@ -66,6 +80,22 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
             e.setName(opodDevices.getName());
             // 根据总抓拍人数计算当前小时抓拍人数
             calcDeviceHourNum(hour, e);
+        });
+        return list;
+    }
+
+    /**
+     * 从mongo中获取所有区域摄像头人数
+     */
+    private List<AreaDeviceSubject> listAllAreaDevice() {
+        int hour = LocalDateTime.now().getHour();
+        Query query = new Query();
+        Criteria criteria = Criteria.where("date").is(LocalDate.now().toString());
+        query.addCriteria(criteria);
+        List<AreaDeviceSubject> list = mongotemplate.find(query, AreaDeviceSubject.class);
+        list.forEach(e -> {
+            // 根据总抓拍人数计算当前小时抓拍人数
+            calcAreaDeviceHourNum(hour, e);
         });
         return list;
     }
@@ -87,7 +117,35 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
                 List<DeviceSubject> dataList = new ArrayList<>();
                 list.forEach(e -> {
                     String key = x.contains(spiltStr) ? x.split("-")[1] : x;
-                    DeviceSubject deviceSubject = (DeviceSubject) redisUtil.get(key + "_" + e.getId());
+                    DeviceSubject deviceSubject = (DeviceSubject) redisUtil.get(key + "_device_" + e.getId());
+                    dataList.add(deviceSubject);
+                });
+                dataMap.put(x, dataList);
+            }
+            i.getAndIncrement();
+        });
+
+        return dataMap;
+    }
+
+    /**
+     * 获取所有区域当前时间的前5个纵轴数据
+     */
+    private LinkedHashMap<String, List<AreaDeviceSubject>> listAllAreaFiveVerticalData(int hour, List<AreaDeviceSubject> list) {
+        LinkedHashMap<String, List<AreaDeviceSubject>> dataMap = new LinkedHashMap<>(8);
+        String spiltStr = "-";
+        // 根据当前时间获取纵轴时间点
+        String[] verticalAxis = getDataByHour(hour);
+        // 组装数据
+        AtomicInteger i = new AtomicInteger();
+        Arrays.stream(verticalAxis).forEach(x -> {
+            if (i.get() == (verticalAxis.length - 1)) {
+                dataMap.put(x, list);
+            } else {
+                List<AreaDeviceSubject> dataList = new ArrayList<>();
+                list.forEach(e -> {
+                    String key = x.contains(spiltStr) ? x.split("-")[1] : x;
+                    AreaDeviceSubject deviceSubject = (AreaDeviceSubject) redisUtil.get(key + "_area_" + e.getId());
                     dataList.add(deviceSubject);
                 });
                 dataMap.put(x, dataList);
@@ -109,20 +167,33 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
     public void updateDeviceSubjectData() {
         LocalDateTime now = LocalDateTime.now();
         int key = now.getHour();
+        // 单个摄像头
         Query query = new Query();
         query.with(Sort.by(Sort.Order.desc("face_subject_num")));
         List<DeviceSubject> list = mongotemplate.find(query, DeviceSubject.class);
         list.forEach(e -> {
             OpodDevices opodDevices = getOpodByDeviceId(e.getDeviceId());
             e.setName(opodDevices.getName());
-            log.info("更新OpodDevices---> {}", opodDevices);
-            // redisUtil.zSSet("HOUR" + key, e, e.getFaceSubjectNum().doubleValue());
+            /*redisUtil.zSSet("HOUR" + key, e, e.getFaceSubjectNum().doubleValue());*/
 
             // 根据总抓拍人数计算当前小时抓拍人数
             calcDeviceHourNum(key, e);
 
-            // 缓存当前摄像头人数，key:当前小时数_摄像头ObjectId
-            redisUtil.set(key + "_" + e.getId(), e);
+            // 缓存当前摄像头人数，key:当前小时数_device_摄像头ObjectId
+            redisUtil.set(key + "_device_" + e.getId(), e);
+        });
+
+        // 区域摄像头
+        Query areaQuery = new Query();
+        Criteria criteria = Criteria.where("date").is(LocalDate.now().toString());
+        areaQuery.addCriteria(criteria);
+        List<AreaDeviceSubject> areaList = mongotemplate.find(areaQuery, AreaDeviceSubject.class);
+        areaList.forEach(e -> {
+            // 根据总抓拍人数计算当前小时抓拍人数
+            calcAreaDeviceHourNum(key, e);
+
+            // 缓存区域当前摄像头人数，key:当前小时数_area_摄像头ObjectId
+            redisUtil.set(key + "_area_" + e.getId(), e);
         });
     }
 
@@ -131,7 +202,7 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
         // 如果当前时间为0点之后，则当前人数为总人数减去上一小时的总人数
         if (hour > 0) {
             int lastHour = hour - 1;
-            DeviceSubject sub = (DeviceSubject)redisUtil.get(lastHour + "_" + subject.getId());
+            DeviceSubject sub = (DeviceSubject)redisUtil.get(lastHour + "_device_" + subject.getId());
             if (null != sub) {
                 int num = subject.getFaceSubjectNum() - sub.getFaceSubjectNum();
                 subject.setFaceHourNum(Math.max(num, 0));
@@ -141,6 +212,26 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
         } else {
             // 0点的当前人数则为总抓拍人数
             subject.setFaceHourNum(subject.getFaceSubjectNum());
+        }
+    }
+
+    /** 根据总抓拍人数计算当前小时抓拍人数 */
+    private void calcAreaDeviceHourNum(int hour, AreaDeviceSubject subject) {
+        // 如果当前时间为0点之后，则当前人数为总人数减去上一小时的总人数
+        if (hour > 0) {
+            int lastHour = hour - 1;
+            AreaDeviceSubject sub = (AreaDeviceSubject)redisUtil.get(lastHour + "_area_" + subject.getId());
+            subject.setTotalFaceSubjectNum((subject.getTodayFaceSubjectNum() + subject.getTodayBodySubjectNum()));
+            if (null != sub) {
+                int num = subject.getTotalFaceSubjectNum() - sub.getTotalFaceSubjectNum();
+                subject.setHourFaceSubjectNum(Math.max(num, 0));
+            } else {
+                subject.setHourFaceSubjectNum(subject.getTotalFaceSubjectNum());
+            }
+        } else {
+            // 0点的当前人数则为总抓拍人数
+            subject.setTotalFaceSubjectNum((subject.getTodayFaceSubjectNum() + subject.getTodayBodySubjectNum()));
+            subject.setHourFaceSubjectNum(subject.getTotalFaceSubjectNum());
         }
     }
 
