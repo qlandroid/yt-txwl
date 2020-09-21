@@ -5,7 +5,7 @@ spring:
     name: txwl
   data:
     mongodb:
-      uri: mongodb://localhost:27017/face_platform  #mongodb://admin:admin@10.40.51.33:27018/face_platform
+      uri: mongodb://admin:admin@10.40.51.33:27018/face_platform  #mongodb://localhost:27017/face_platform  #mongodb://admin:admin@10.40.51.33:27018/face_platform
   redis:
     database: 0
     host: localhost
@@ -21,3 +21,6 @@ OpodDecOrEnc:
 
 logging:
   config: classpath:log/logback-spring.xml
+
+jobs:
+  corn: 0 0/1 * * * ?

@@ -18,7 +18,7 @@ import java.util.StringJoiner;
 public class DeviceSubject {
 
     @Id
-    private ObjectId id;
+    private String id;
 
     @Field("last_modify_timestamp")
     private Integer lastModifyTimestamp;
@@ -41,11 +41,11 @@ public class DeviceSubject {
         this.name = name;
     }
 
-    public ObjectId getId() {
+    public String getId() {
         return id;
     }
 
-    public void setId(ObjectId id) {
+    public void setId(String id) {
         this.id = id;
     }
 

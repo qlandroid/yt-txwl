@@ -101,8 +101,9 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
      * @author WJ
      * @date 2020-09-18 14:48:04
      */
+    @Override
     @Scheduled(cron = "0 0/5 * * * ?")
-    private void updateDeviceSubjectData() {
+    public void updateDeviceSubjectData() {
         LocalDateTime now = LocalDateTime.now();
         int key = now.getHour();
         Query query = new Query();
@@ -112,8 +113,8 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
             OpodDevices opodDevices = getOpodByDeviceId(e.getDeviceId());
             e.setName(opodDevices.getName());
             log.debug("OpodDevices---> {}", opodDevices);
-            // 缓存当前摄像头人数，key:当前小时数_摄像头ObjectId
             // redisUtil.zSSet("HOUR" + key, e, e.getFaceSubjectNum().doubleValue());
+            // 缓存当前摄像头人数，key:当前小时数_摄像头ObjectId
             redisUtil.set(key + "_" + e.getId(), e);
         });
     }

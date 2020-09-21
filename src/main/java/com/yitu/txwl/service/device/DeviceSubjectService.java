@@ -20,4 +20,5 @@ public interface DeviceSubjectService {
      * @date   2020-09-18 14:17:07
      */
     LinkedHashMap<String, List<DeviceSubject>> listTop4CenterStatistics();
+    void updateDeviceSubjectData();
 }
