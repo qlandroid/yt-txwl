@@ -102,12 +102,13 @@ public class DeviceSubject {
     @Override
     public String toString() {
         return new StringJoiner(", ", DeviceSubject.class.getSimpleName() + "[", "]")
-                .add("id=" + id)
+                .add("id='" + id + "'")
                 .add("lastModifyTimestamp=" + lastModifyTimestamp)
                 .add("deviceId='" + deviceId + "'")
                 .add("araeId=" + araeId)
                 .add("areaName='" + areaName + "'")
                 .add("faceSubjectNum=" + faceSubjectNum)
+                .add("faceHourNum=" + faceHourNum)
                 .add("name='" + name + "'")
                 .toString();
     }

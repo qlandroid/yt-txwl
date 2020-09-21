@@ -53,6 +53,7 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
      * 从mongo中获取排名前4人数摄像头
      */
     private List<DeviceSubject> listTop4Device() {
+        int hour = LocalDateTime.now().getHour();
         Query query = new Query();
         Criteria criteria = new Criteria();
         // 获取排名前4入口人数
@@ -63,6 +64,8 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
         list.forEach(e -> {
             OpodDevices opodDevices = getOpodByDeviceId(e.getDeviceId());
             e.setName(opodDevices.getName());
+            // 根据总抓拍人数计算当前小时抓拍人数
+            calcDeviceHourNum(hour, e);
         });
         return list;
     }
@@ -115,19 +118,30 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
             log.info("更新OpodDevices---> {}", opodDevices);
             // redisUtil.zSSet("HOUR" + key, e, e.getFaceSubjectNum().doubleValue());
 
-            // 如果当前时间为0点之后，则当前人数为总人数减去上一小时的总人数
-            if (key > 0) {
-                int lastHour = key - 1;
-                DeviceSubject sub = (DeviceSubject)redisUtil.get(lastHour + "_" + e.getId());
-                if (null != sub) {
-                    int num = e.getFaceSubjectNum() - sub.getFaceSubjectNum();
-                    e.setFaceHourNum(Math.max(num, 0));
-                }
-            }
+            // 根据总抓拍人数计算当前小时抓拍人数
+            calcDeviceHourNum(key, e);
 
             // 缓存当前摄像头人数，key:当前小时数_摄像头ObjectId
             redisUtil.set(key + "_" + e.getId(), e);
         });
+    }
+
+    /** 根据总抓拍人数计算当前小时抓拍人数 */
+    private void calcDeviceHourNum(int hour, DeviceSubject subject) {
+        // 如果当前时间为0点之后，则当前人数为总人数减去上一小时的总人数
+        if (hour > 0) {
+            int lastHour = hour - 1;
+            DeviceSubject sub = (DeviceSubject)redisUtil.get(lastHour + "_" + subject.getId());
+            if (null != sub) {
+                int num = subject.getFaceSubjectNum() - sub.getFaceSubjectNum();
+                subject.setFaceHourNum(Math.max(num, 0));
+            } else {
+                subject.setFaceHourNum(subject.getFaceSubjectNum());
+            }
+        } else {
+            // 0点的当前人数则为总抓拍人数
+            subject.setFaceHourNum(subject.getFaceSubjectNum());
+        }
     }
 
     /**
