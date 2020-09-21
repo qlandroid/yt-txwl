@@ -27,7 +27,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/device")
-public class DeviceController {
+public class CenterEnterController {
     private Logger log = LoggerFactory.getLogger(this.getClass());
 
     @Autowired
@@ -73,7 +73,7 @@ public class DeviceController {
         list.forEach(e -> {
             // 缓存当前摄像头人数，key:当前小时数_摄像头ObjectId
             // redisUtil.zSSet("HOUR" + key, e, e.getFaceSubjectNum().doubleValue());
-            redisUtil.set(key + "_" + e.getId(), e);
+            redisUtil.set(key + "_device_" + e.getId(), e);
         });
     }
 
