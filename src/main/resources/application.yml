@@ -16,11 +16,13 @@ spring:
     lettuce.pool.max-idle: 8
     lettuce.pool.min-idle: 0
 
-OpodDecOrEnc:
-  url: http://10.40.51.33:9700
-
 logging:
   config: classpath:log/logback-spring.xml
 
-jobs:
-  corn: 0 0/1 * * * ?
+# yitu接口地址
+OpodDecOrEnc:
+  url: http://10.40.51.33:9700
+
+# 接口工具地址
+fetchTrack:
+  filePath:
