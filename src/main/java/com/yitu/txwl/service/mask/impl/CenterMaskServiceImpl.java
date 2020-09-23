@@ -55,7 +55,7 @@ public class CenterMaskServiceImpl implements CenterMaskService {
         deleteFiles();
 
         // 执行shell脚本
-         execShell();
+        execShell();
 
         // 读取pedestrian_meta文件下的meta文件并缓存结果
         readFile();
@@ -66,7 +66,7 @@ public class CenterMaskServiceImpl implements CenterMaskService {
         // 先从redis获取数据
         List<CenterMaskPojo> list = (List<CenterMaskPojo>) redisUtil.get("center_mask");
         // 如果redis为空，则去读取接口文件目录meta下数据
-        if (list.isEmpty()) {
+        if (null == list || list.isEmpty()) {
             list = readFile();
             // 如果依然为空， 则重新调用定时任务，获取meta数据
             if (list.isEmpty()) {
@@ -84,6 +84,8 @@ public class CenterMaskServiceImpl implements CenterMaskService {
      * 否则默认使用项目同级目录下的fetch_track地址
      */
     private void initFilePath() {
+        // 如果已打成jar包，则返回jar包所在目录
+        // 如果未打成jar，则返回项目所在目录
         String path = System.getProperty("user.dir") + File.separator + "fetch_track";
         filePath = StringUtils.isEmpty(filePath) ? path : filePath;
     }
@@ -149,19 +151,25 @@ public class CenterMaskServiceImpl implements CenterMaskService {
      * 执行sh脚本
      */
     private void execShell() {
-        String path = filePath + File.separator + "run_fetch_track.sh";
-        String command = "sh " + path;
+        String path = filePath + File.separator;
+        String command = "bash run_fetch_track.sh";
         Process pid;
         try {
             // 执行linux sh命令
-            pid = Runtime.getRuntime().exec(command);
+            log.info(command);
+            pid = Runtime.getRuntime().exec(command, null, new File(path));
             if (null != pid) {
+                pid.getOutputStream();
                 // 等待进程结束
                 pid.waitFor();
+                if (pid.exitValue() == 0) {
+                    log.info("execShell---------------> sh脚本执行成功");
+                } else {
+                    log.info("execShell---------------> sh脚本执行完成");
+                }
             } else {
-                log.error("execShell---------------> 没有pid");
+                log.error("execShell---------------> sh脚本执行失败");
             }
-            log.info("execShell---------------> sh脚本执行完成");
         } catch (Exception e) {
             e.printStackTrace();
         }
