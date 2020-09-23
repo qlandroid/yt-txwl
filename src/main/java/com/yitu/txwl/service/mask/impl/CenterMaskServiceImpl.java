@@ -176,7 +176,7 @@ public class CenterMaskServiceImpl implements CenterMaskService {
     }
 
     /**
-     * 读取文件
+     * 删除文件
      */
     private void deleteFiles() {
         String path = filePath + File.separator + "pedestrian_meta";
