@@ -75,7 +75,7 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
         Criteria criteria = new Criteria();
         // 获取排名前4入口人数
         query.addCriteria(criteria)
-                .limit(4)
+                //.limit(4)
                 .with(Sort.by(Sort.Order.desc("face_subject_num")));
         List<DeviceSubject> list = mongotemplate.find(query, DeviceSubject.class);
         list.forEach(e -> {
@@ -118,7 +118,7 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
     private LinkedList<CenterEnterPojo> listVerticalData(int hour, int minute, List<DeviceSubject> list) {
         LinkedList<CenterEnterPojo> returnList = new LinkedList<>();
 
-        for (DeviceSubject e : list) {
+        /*for (DeviceSubject e : list) {
             CenterEnterPojo pojo = new CenterEnterPojo();
             List<Statistic> dataList = new ArrayList<>();
             for (int i = 6; i <= hour; i++) {
@@ -143,12 +143,12 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
             pojo.setAreaName(e.getName());
             pojo.setStatistic(dataList);
             returnList.add(pojo);
-        }
-
-        /*list.forEach(e -> {
+        }*/
+        AtomicInteger count = new AtomicInteger(1);
+        list.forEach(e -> {
             CenterEnterPojo pojo = new CenterEnterPojo();
             List<Statistic> dataList = new ArrayList<>();
-            for (int i=6; i<= hour; i++) {
+            for (int i = 6; i <= hour; i++) {
                 for (int j = 0; j < 4; j++) {
                     // 根据当前小时的分钟数来计算需要查询的摄像头数据
                     if (i == hour) {
@@ -159,17 +159,20 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
                     }
                     String key = i + "_" + j;
                     DeviceSubject deviceSubject = (DeviceSubject) redisUtil.get(key + "_device_" + e.getId());
+                    Statistic statistic = new Statistic();
                     if (null != deviceSubject) {
-                        Statistic statistic = new Statistic();
                         statistic.setFace_num(deviceSubject.getFaceHourNum());
-                        dataList.add(statistic);
                     }
+                    dataList.add(statistic);
                 }
             }
-            pojo.setAreaId(e.getAraeId());
-            pojo.setAreaName(e.getAreaName());
+            //pojo.setAreaId(e.getAraeId());
+            pojo.setAreaId(count.getAndIncrement());
+            pojo.setAreaName(e.getName());
             pojo.setStatistic(dataList);
-        });*/
+            returnList.add(pojo);
+        });
+
         return returnList;
     }
 
