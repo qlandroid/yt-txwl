@@ -1,9 +1,10 @@
 package com.yitu.txwl.service.device;
 
 import com.yitu.txwl.entity.AreaDeviceSubject;
-import com.yitu.txwl.entity.DeviceSubject;
+import com.yitu.txwl.pojo.CenterEnterPojo;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 
 /**
@@ -20,7 +21,7 @@ public interface DeviceSubjectService {
      * @author WJ
      * @date   2020-09-18 14:17:07
      */
-    LinkedHashMap<String, List<DeviceSubject>> listTop4CenterStatistics();
+    LinkedList<CenterEnterPojo> listTop4CenterStatistics();
 
     /**
      * 更新当前时间段摄像头人数并缓存

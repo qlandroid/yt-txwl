@@ -3,6 +3,7 @@ package com.yitu.txwl.ctl;
 import com.yitu.txwl.core.util.RedisUtil;
 import com.yitu.txwl.entity.AreaDeviceSubject;
 import com.yitu.txwl.entity.DeviceSubject;
+import com.yitu.txwl.pojo.CenterEnterPojo;
 import com.yitu.txwl.service.device.DeviceSubjectService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,11 +12,11 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 
 /**
@@ -44,7 +45,7 @@ public class CenterEnterController {
      * @date   2020-09-19 22:25:05
      */
     @GetMapping("/centerStatistics")
-    public HashMap<String, List<DeviceSubject>> listTop4CenterStatistics() {
+    public LinkedList<CenterEnterPojo> listTop4CenterStatistics() {
         return deviceSubjectService.listTop4CenterStatistics();
     }
 
@@ -59,7 +60,7 @@ public class CenterEnterController {
         return deviceSubjectService.listAllAreaStatistics(areaId);
     }
 
-    @PostMapping("/update")
+    @GetMapping("/update")
     public void testUpdate() {
         deviceSubjectService.updateDeviceSubjectData();
     }
