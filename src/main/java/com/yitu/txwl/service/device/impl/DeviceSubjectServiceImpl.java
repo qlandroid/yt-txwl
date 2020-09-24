@@ -49,9 +49,9 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
         int hour = now.getHour();
         int minute = now.getMinute();
         List<DeviceSubject> list;
-        // 获取排名前4人数摄像头
+        // 获取所有人数摄像头
         list = listTop4Device(hour, minute);
-        // 根据4个摄像头获取摄像头的前5个纵轴的数据
+        // 根据摄像头获取摄像头的历史数据
         return listVerticalData(hour, minute, list);
     }
 
@@ -65,7 +65,7 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
     }
 
     /**
-     * 从mongo中获取排名前4人数摄像头
+     * 从mongo中获取所有人数摄像头
      */
     private List<DeviceSubject> listTop4Device(int hour, int minute) {
         // int hour = LocalDateTime.now().getHour();
@@ -73,7 +73,7 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
 
         Query query = new Query();
         Criteria criteria = new Criteria();
-        // 获取排名前4入口人数
+        // 获取所有入口人数
         query.addCriteria(criteria)
                 //.limit(4)
                 .with(Sort.by(Sort.Order.desc("face_subject_num")));
@@ -112,53 +112,35 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
 
     /**
      * 获取指定摄像头数据
-     * 12点之前返回6-12点数据
-     * 12点之后返回6-18点数据
+     * 12点之前返回6-12点数据，目前返回6-当前时间(可能大于12)
+     * 12点之后返回6-18(待定)点数据，目前返回6-当前时间(可能大于18)
      */
     private LinkedList<CenterEnterPojo> listVerticalData(int hour, int minute, List<DeviceSubject> list) {
         LinkedList<CenterEnterPojo> returnList = new LinkedList<>();
-
-        /*for (DeviceSubject e : list) {
-            CenterEnterPojo pojo = new CenterEnterPojo();
-            List<Statistic> dataList = new ArrayList<>();
-            for (int i = 6; i <= hour; i++) {
-                for (int j = 0; j < 4; j++) {
-                    // 根据当前小时的分钟数来计算需要查询的摄像头数据
-                    if (i == hour) {
-                        int min = Integer.parseInt(getKey(hour, minute).split("_")[1]);
-                        if (j > min) {
-                            break;
-                        }
-                    }
-                    String key = i + "_" + j;
-                    DeviceSubject deviceSubject = (DeviceSubject) redisUtil.get(key + "_device_" + e.getId());
-                    Statistic statistic = new Statistic();
-                    if (null != deviceSubject) {
-                        statistic.setFace_num(deviceSubject.getFaceHourNum());
-                    }
-                    dataList.add(statistic);
-                }
-            }
-            pojo.setAreaId(e.getAraeId());
-            pojo.setAreaName(e.getName());
-            pojo.setStatistic(dataList);
-            returnList.add(pojo);
-        }*/
+        // 当前需要的最大数据组
+        int maxMinute = Integer.parseInt(getKey(hour, minute).split("_")[1]);
         AtomicInteger count = new AtomicInteger(1);
         list.forEach(e -> {
             CenterEnterPojo pojo = new CenterEnterPojo();
             List<Statistic> dataList = new ArrayList<>();
             for (int i = 6; i <= hour; i++) {
                 for (int j = 0; j < 4; j++) {
+                    DeviceSubject deviceSubject;
                     // 根据当前小时的分钟数来计算需要查询的摄像头数据
                     if (i == hour) {
-                        int min = Integer.parseInt(getKey(hour, minute).split("_")[1]);
-                        if (j > min) {
+                        if (j > maxMinute) {
+                            // 只返回6点到当前小时以及分钟所属组的数据
                             break;
                         }
                     }
                     String key = i + "_" + j;
-                    DeviceSubject deviceSubject = (DeviceSubject) redisUtil.get(key + "_device_" + e.getId());
+                    if (i == hour && j == maxMinute) {
+                        // 最新数据使用从mongo中获取的数据
+                        deviceSubject = e;
+                    } else {
+                        // 历史数据从redis中获取
+                        deviceSubject = (DeviceSubject) redisUtil.get(key + "_device_" + e.getId());
+                    }
                     Statistic statistic = new Statistic();
                     if (null != deviceSubject) {
                         statistic.setFace_num(deviceSubject.getFaceHourNum());
@@ -166,7 +148,7 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
                     dataList.add(statistic);
                 }
             }
-            //pojo.setAreaId(e.getAraeId());
+            // pojo.setAreaId(e.getAreaId());
             pojo.setAreaId(count.getAndIncrement());
             pojo.setAreaName(e.getName());
             pojo.setStatistic(dataList);
@@ -179,6 +161,7 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
     /**
      * 获取指定摄像头当前时间的前5个纵轴数据
      */
+    @Deprecated
     private LinkedHashMap<String, List<DeviceSubject>> listFiveVerticalData(int hour, List<DeviceSubject> list) {
         LinkedHashMap<String, List<DeviceSubject>> dataMap = new LinkedHashMap<>(8);
         String spiltStr = "-";
@@ -208,6 +191,7 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
     /**
      * 获取所有区域当前时间的前5个纵轴数据
      */
+    @Deprecated
     private LinkedHashMap<String, List<AreaDeviceSubject>> listAllAreaFiveVerticalData(int hour, List<AreaDeviceSubject> list) {
         LinkedHashMap<String, List<AreaDeviceSubject>> dataMap = new LinkedHashMap<>(8);
         String spiltStr = "-";
@@ -221,7 +205,6 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
             } else {
                 List<AreaDeviceSubject> dataList = new ArrayList<>();
                 list.forEach(e -> {
-                    /* 假如是12-14，则查询13_area_id的缓存数据 */
                     String key = x.contains(spiltStr) ? String.valueOf((Integer.parseInt(x.split("-")[0]) + 1)) : x;
                     AreaDeviceSubject deviceSubject = (AreaDeviceSubject) redisUtil.get(key + "_area_" + e.getId());
                     dataList.add(deviceSubject);
@@ -275,18 +258,26 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
             // 根据总抓拍人数计算当前小时抓拍人数
             calcAreaDeviceHourNum(key, e);
 
-            // 缓存区域当前摄像头人数，key:当前小时数_area_摄像头ObjectId
+            // 缓存区域当前摄像头人数，key:当前小时数_分钟(0/1/2/3)_area_摄像头ObjectId
             redisUtil.set(key + "_area_" + e.getId(), e);
         });
     }
 
+    /**
+     * 因为需要15分钟记录一次数据，所以根据当前分钟分组
+     * 0-15  0
+     * 15-30 1
+     * 30-45 2
+     * 45-00 3
+     * 返回key = hour_group
+     */
     private String getKey(int hour, int minute) {
         String key = String.valueOf(hour);
-        if (minute < 15) {
+        if (minute <= 15) {
             key = key + "_0";
-        } else if (15 < minute && minute < 30) {
+        } else if (minute <= 30) {
             key = key + "_1";
-        } else if (30 < minute && minute < 45) {
+        } else if (minute <= 45) {
             key = key + "_2";
         } else {
             key = key + "_3";
@@ -296,6 +287,7 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
 
     /**
      * 根据总抓拍人数计算当前小时抓拍人数
+     * 因为每15分钟缓存一次数据，所以根据minute分钟数来分组(0 1 2 3)
      */
     private void calcDeviceHourNum(String key, DeviceSubject subject) {
         String[] s = key.split("_");
@@ -303,6 +295,7 @@ public class DeviceSubjectServiceImpl implements DeviceSubjectService {
         int minute = Integer.parseInt(s[1]);
         // 如果当前时间为0点之后，则当前人数为总人数减去上一次缓存的总人数
         if (hour > 0) {
+            // 分组 0 1 2 3
             int lastHour = hour;
             if (minute == 0) {
                 lastHour = hour - 1;
