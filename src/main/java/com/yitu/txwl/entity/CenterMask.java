@@ -65,9 +65,9 @@ public class CenterMask implements Comparable<CenterMask>{
                 .toString();
     }
 
-    /** 降序排序 */
+    /** 升序排序 */
     @Override
     public int compareTo(CenterMask o) {
-        return o.getMaskProportion().compareTo(maskProportion);
+        return maskProportion.compareTo(o.getMaskProportion());
     }
 }

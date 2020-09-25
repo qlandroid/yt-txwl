@@ -21,6 +21,7 @@ import java.io.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -208,6 +209,8 @@ public class CenterMaskServiceImpl implements CenterMaskService {
         File dirFile = new File(path);
         File[] files = dirFile.listFiles();
         LinkedHashMap<Integer, CenterMask> map = new LinkedHashMap<>();
+        Integer totalNum = 0;
+        Integer maskNum = 0;
         if (null != files && files.length > 0) {
             BufferedReader br = null;
             String line;
@@ -225,9 +228,11 @@ public class CenterMaskServiceImpl implements CenterMaskService {
                             data.setTotalFace(data.getTotalFace() + 1);
                             // rec_mask 1是戴口罩，0是不戴口罩，-1是未知
                             if (null != recMask && recMask == 1) {
+                                maskNum += 1;
                                 data.setMaskFace(data.getMaskFace() + 1);
                             }
                             map.put(cameraId, data);
+                            totalNum += 1;
                         }
                     }
                 } catch (Exception e) {
@@ -244,6 +249,10 @@ public class CenterMaskServiceImpl implements CenterMaskService {
             }
         }
 
+        // 计算总比例
+        BigDecimal totalMaskProportion = new BigDecimal(maskNum).multiply(new BigDecimal(100))
+                .divide(new BigDecimal(totalNum), BigDecimal.ROUND_HALF_UP);
+
         // 读完meta数据后清空
         deleteFiles();
 
@@ -253,12 +262,16 @@ public class CenterMaskServiceImpl implements CenterMaskService {
                     .divide(new BigDecimal(v.getTotalFace()), BigDecimal.ROUND_HALF_UP);
             v.setMaskProportion(proportion.intValue());
         });
+
+        // 计算总比例
+
+
         // 根据口罩指数排序
-        // 取前4
+        // 取前3
         // 并转为List
         List<CenterMaskPojo> list = map.entrySet().stream()
                 .sorted(Map.Entry.comparingByValue())
-                .limit(4)
+                .limit(3)
                 .map(e -> {
                     CenterMaskPojo pojo = new CenterMaskPojo();
                     pojo.setId(e.getValue().getCameraId());
@@ -267,8 +280,14 @@ public class CenterMaskServiceImpl implements CenterMaskService {
                 })
                 .collect(Collectors.toList());
 
-        // TODO 将结果缓存
+        CenterMaskPojo pojo = new CenterMaskPojo();
+        pojo.setId(0);
+        pojo.setValue(totalMaskProportion.intValue());
+        list.add(pojo);
+        // 结果翻转
+        Collections.reverse(list);
 
+        // TODO 将结果缓存
         return list;
     }
 
