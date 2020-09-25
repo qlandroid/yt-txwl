@@ -1,14 +1,18 @@
 package com.yitu.txwl.service.mask.impl;
 
 import com.alibaba.fastjson.JSONObject;
-import com.yitu.txwl.core.util.RedisUtil;
 import com.yitu.txwl.entity.CenterMask;
+import com.yitu.txwl.entity.FetchTrackToolCache;
 import com.yitu.txwl.pojo.CenterMaskPojo;
 import com.yitu.txwl.service.mask.CenterMaskService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -36,7 +40,7 @@ public class CenterMaskServiceImpl implements CenterMaskService {
     @Value("${fetchTrack.filePath}")
     private String filePath;
     @Autowired
-    private RedisUtil redisUtil;
+    private MongoTemplate mongotemplate;
 
     @Override
     @Scheduled(cron = "0 0/5 * * * ?")
@@ -49,7 +53,7 @@ public class CenterMaskServiceImpl implements CenterMaskService {
 
         // 缓存当前调用时间戳 10位
         Long milli = LocalDateTime.now().toEpochSecond(ZoneOffset.of("+8"));
-        redisUtil.set("fetch_track_start_time", milli);
+        updateCacheTime(milli);
 
         // 执行脚本之前先清空pedestrian_meta目录下文件
         deleteFiles();
@@ -63,16 +67,14 @@ public class CenterMaskServiceImpl implements CenterMaskService {
 
     @Override
     public List<CenterMaskPojo> getCenterMaskData() {
-        // 先从redis获取数据
-        List<CenterMaskPojo> list = (List<CenterMaskPojo>) redisUtil.get("center_mask");
+        // TODO 先从缓存获取数据
+        List<CenterMaskPojo> list;
         // 如果redis为空，则去读取接口文件目录meta下数据
-        if (null == list || list.isEmpty()) {
+        list = readFile();
+        // 如果依然为空， 则重新调用定时任务，获取meta数据
+        if (list.isEmpty()) {
+            execFetchTrackMeta();
             list = readFile();
-            // 如果依然为空， 则重新调用定时任务，获取meta数据
-            if (list.isEmpty()) {
-                execFetchTrackMeta();
-                list = readFile();
-            }
         }
 
         return list;
@@ -95,12 +97,21 @@ public class CenterMaskServiceImpl implements CenterMaskService {
      */
     private void updateFetchTrackConf() {
         String path = filePath + File.separator + "fetch_track_tool" + File.separator + "fetch_track_meta.conf";
-        Integer startTime = (Integer) redisUtil.get("fetch_track_start_time");
-        // 如果redis缓存中不存在说明还未调用过接口工具
+        // 创建表及插入缓存数据
+        if (!mongotemplate.collectionExists(FetchTrackToolCache.class)) {
+            mongotemplate.createCollection(FetchTrackToolCache.class);
+        }
+        Query query = new Query();
+        // 根据摄像头加密ID查询数据
+        Criteria criteria = Criteria.where("id").is("fetch_track_start_time");
+        query.addCriteria(criteria);
+        FetchTrackToolCache cache = mongotemplate.findOne(query, FetchTrackToolCache.class);
+        // 如果缓存中不存在说明还未调用过接口工具
         // 不修改配置文件
-        if (null == startTime) {
+        if (null == cache) {
             return;
         }
+        Integer startTime = cache.getTime();
         BufferedWriter bw = null;
         BufferedReader br = null;
         String line;
@@ -256,11 +267,22 @@ public class CenterMaskServiceImpl implements CenterMaskService {
                 })
                 .collect(Collectors.toList());
 
-        // 将结果缓存到redis
-        if (!list.isEmpty()) {
-            redisUtil.set("center_mask", list);
-        }
+        // TODO 将结果缓存
+
         return list;
+    }
+
+    /** 缓存当前时间戳 */
+    private void updateCacheTime(Long milli) {
+        // 缓存数据
+        Query updateQuery = new Query();
+        // 根据摄像头加密ID查询数据
+        Criteria criteria = Criteria.where("id").is("fetch_track_start_time");
+        updateQuery.addCriteria(criteria);
+        // 更新的字段
+        Update update = new Update();
+        update.set("time", milli.intValue());
+        mongotemplate.upsert(updateQuery, update, FetchTrackToolCache.class);
     }
 
 }

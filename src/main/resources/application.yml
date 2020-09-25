@@ -5,16 +5,16 @@ spring:
     name: txwl
   data:
     mongodb:
-      uri: mongodb://admin:admin@10.40.51.33:27018/face_platform  #mongodb://localhost:27017/face_platform  #mongodb://admin:admin@10.40.51.33:27018/face_platform
-  redis:
-    database: 0
-    host: localhost
-    port: 6379
-    password:
-    lettuce.pool.max-active: 8
-    lettuce.pool.max-wait: -1
-    lettuce.pool.max-idle: 8
-    lettuce.pool.min-idle: 0
+      uri: mongodb://localhost:27017/face_platform  #mongodb://admin:admin@10.40.51.33:27018/face_platform
+#  redis:
+#    database: 0
+#    host: localhost
+#    port: 6379
+#    password:
+#    lettuce.pool.max-active: 8
+#    lettuce.pool.max-wait: -1
+#    lettuce.pool.max-idle: 8
+#    lettuce.pool.min-idle: 0
 
 logging:
   config: classpath:log/logback-spring.xml
@@ -25,4 +25,7 @@ OpodDecOrEnc:
 
 # 接口工具地址
 fetchTrack:
+  # 为空则默认在jar同级目录
+  # windows例:G:\Work\Yitu\demo\fetch_track
+  # linux  例:/Yitu/demo/fetch_track
   filePath:
