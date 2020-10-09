@@ -5,6 +5,7 @@ import com.yitu.txwl.entity.CenterEnter;
 import com.yitu.txwl.entity.DeviceSubject;
 import com.yitu.txwl.entity.OpodDevices;
 import com.yitu.txwl.pojo.CenterEnterPojo;
+import com.yitu.txwl.pojo.EnterTimeAreaPojo;
 import com.yitu.txwl.pojo.Statistic;
 import com.yitu.txwl.service.device.CenterEnterService;
 import com.yitu.txwl.service.ext.OpodDecOrEncService;
@@ -42,9 +43,10 @@ public class CenterEnterServiceImpl implements CenterEnterService {
 
     /**
      * 从mongo中获取所有摄像头
+     * @param areaList 需要查询区域，以及区域下边的摄像头信息
      */
     @Override
-    public LinkedList<CenterEnterPojo> listAllDevice() {
+    public LinkedList<CenterEnterPojo> listAllDevice(List<EnterTimeAreaPojo> areaList) {
         Query query = new Query();
         Criteria criteria = new Criteria();
         // 获取所有入口人数
@@ -52,11 +54,13 @@ public class CenterEnterServiceImpl implements CenterEnterService {
                 .with(Sort.by(Sort.Order.desc("face_subject_num")));
         List<DeviceSubject> list = mongotemplate.find(query, DeviceSubject.class);
 
+        List<CenterEnter> decodeList = new ArrayList<>();
         LinkedList<CenterEnterPojo> pojoList = new LinkedList<>();
         AtomicInteger count = new AtomicInteger(1);
         list.forEach(e -> {
             // 根据摄像头数据获取摄像头历史数据
             CenterEnter centerEnter = getCenterEnterByDeviceId(e);
+            decodeList.add(centerEnter);
             // 组装需要返回的数据
             CenterEnterPojo pojo = new CenterEnterPojo();
             List<Statistic> dataList = new ArrayList<>();
@@ -70,8 +74,54 @@ public class CenterEnterServiceImpl implements CenterEnterService {
             pojo.setStatistic(dataList);
             pojoList.add(pojo);
         });
-        return pojoList;
+
+        AtomicInteger count2 = new AtomicInteger(1);
+        LinkedList<CenterEnterPojo> resultList = new LinkedList<>();
+        areaList.forEach( area -> {
+            String areaName = area.getAreaName();
+            List<String> bindCameraIds = area.getBindCameraIds();
+
+            List<CenterEnter> cameraIds = findCameraIds(bindCameraIds, decodeList);
+            List<Statistic> dataList = new ArrayList<>();
+            cameraIds.forEach( cameraData -> {
+                CenterEnter centerEnter = cameraData;
+                for (int i = 0; i < centerEnter.getFaceNum().size(); i++) {
+                    if (i >= dataList.size()){
+                        Statistic statistic = new Statistic();
+                        statistic.setFace_num(centerEnter.getFaceNum().get(i));
+                        dataList.add(statistic);
+                        continue;
+                    }
+                    Statistic statistic = dataList.get(i);
+                    int add = statistic.getFace_num() + centerEnter.getFaceNum().get(i);
+                    statistic.setFace_num(add);
+                }
+            });
+
+
+            CenterEnterPojo pojo = new CenterEnterPojo();
+            pojo.setAreaName(areaName);
+            pojo.setAreaId(count2.getAndIncrement());
+            pojo.setStatistic(dataList);
+            resultList.add(pojo);
+
+        });
+        return resultList;
     }
+
+    private List<CenterEnter> findCameraIds(List<String> ids,List<CenterEnter> list){
+        List<CenterEnter>  findList = new ArrayList<>();
+
+        ids.forEach( id -> {
+            list.forEach( devsub -> {
+                if ( id.trim().equals(devsub.getId())){
+                    findList.add(devsub);
+                }
+            });
+        });
+        return findList;
+    }
+
 
     /**
      * 获取摄像头数据
@@ -118,6 +168,9 @@ public class CenterEnterServiceImpl implements CenterEnterService {
         } else {
             // 获取当前时间段记录人数= mongo中记录总人数 - 缓存的历史总人数
             int num = subject.getFaceSubjectNum() - centerEnter.getTotalNum();
+            if(num<0){
+                num=0;
+            }
             List<Integer> historyList = centerEnter.getFaceNum();
             if (historyList == null) {
                 historyList = new ArrayList<>();

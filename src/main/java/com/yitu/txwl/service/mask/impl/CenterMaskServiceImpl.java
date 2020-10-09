@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.yitu.txwl.entity.CenterMask;
 import com.yitu.txwl.entity.FetchTrackToolCache;
 import com.yitu.txwl.pojo.CenterMaskPojo;
+import com.yitu.txwl.pojo.CenterMaskSearch;
 import com.yitu.txwl.service.mask.CenterMaskService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +22,9 @@ import java.io.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +47,7 @@ public class CenterMaskServiceImpl implements CenterMaskService {
     private MongoTemplate mongotemplate;
 
     @Override
-    @Scheduled(cron = "0 0/5 * * * ?")
+    @Scheduled(cron = "0 0/5 * * * ?" )
     public void execFetchTrackMeta() {
         // 初始化工具地址
         initFilePath();
@@ -63,19 +66,19 @@ public class CenterMaskServiceImpl implements CenterMaskService {
         execShell();
 
         // 读取pedestrian_meta文件下的meta文件并缓存结果
-        readFile();
+        // readFile();
     }
 
     @Override
-    public List<CenterMaskPojo> getCenterMaskData() {
+    public List<CenterMaskPojo> getCenterMaskData(CenterMaskSearch search) {
         // TODO 先从缓存获取数据
         List<CenterMaskPojo> list;
         // 如果redis为空，则去读取接口文件目录meta下数据
-        list = readFile();
+        list = readFile(search);
         // 如果依然为空， 则重新调用定时任务，获取meta数据
         if (list.isEmpty()) {
             execFetchTrackMeta();
-            list = readFile();
+            list = readFile(search);
         }
 
         return list;
@@ -204,13 +207,11 @@ public class CenterMaskServiceImpl implements CenterMaskService {
     /**
      * 读取文件并缓存结果
      */
-    private List<CenterMaskPojo> readFile() {
+    private List<CenterMaskPojo> readFile(CenterMaskSearch search) {
         String path = filePath + File.separator + "pedestrian_meta";
         File dirFile = new File(path);
         File[] files = dirFile.listFiles();
         LinkedHashMap<Integer, CenterMask> map = new LinkedHashMap<>();
-        Integer totalNum = 0;
-        Integer maskNum = 0;
         if (null != files && files.length > 0) {
             BufferedReader br = null;
             String line;
@@ -218,6 +219,9 @@ public class CenterMaskServiceImpl implements CenterMaskService {
                 try {
                     if (file.isFile()) {
                         br = new BufferedReader(new FileReader(file));
+                       /* if((line = br.readLine()) != null){
+                            log.info("从meta里面读取了数据");
+                        }*/
                         while ((line = br.readLine()) != null) {
                             // 每一行是一个行人数据
                             JSONObject object = JSONObject.parseObject(line);
@@ -228,11 +232,9 @@ public class CenterMaskServiceImpl implements CenterMaskService {
                             data.setTotalFace(data.getTotalFace() + 1);
                             // rec_mask 1是戴口罩，0是不戴口罩，-1是未知
                             if (null != recMask && recMask == 1) {
-                                maskNum += 1;
                                 data.setMaskFace(data.getMaskFace() + 1);
                             }
                             map.put(cameraId, data);
-                            totalNum += 1;
                         }
                     }
                 } catch (Exception e) {
@@ -249,49 +251,97 @@ public class CenterMaskServiceImpl implements CenterMaskService {
             }
         }
 
-        // 计算总比例
-        BigDecimal totalMaskProportion = new BigDecimal(maskNum).multiply(new BigDecimal(100))
-                .divide(new BigDecimal(totalNum), BigDecimal.ROUND_HALF_UP);
 
-        // 读完meta数据后清空
-        deleteFiles();
+        List<CenterMaskPojo> reList = new ArrayList<CenterMaskPojo>();
 
-        // 计算每个摄像头的口罩指数
-        map.forEach((k, v) -> {
-            BigDecimal proportion = new BigDecimal(v.getMaskFace()).multiply(new BigDecimal(100))
-                    .divide(new BigDecimal(v.getTotalFace()), BigDecimal.ROUND_HALF_UP);
-            v.setMaskProportion(proportion.intValue());
+
+        List<CenterMaskPojo> queryList = search.getQuery();
+        Integer alltotalNum = 0;
+        Integer allmaskNum = 0;
+
+        if (null != queryList && queryList.size() > 0) {
+            for (CenterMaskPojo msk : queryList) {
+                String areaName = msk.getAreaName();
+                String ids = msk.getIds();
+                Integer value = 0; //当前展馆的比例
+                Integer totalNum = 0;//全部人员
+                Integer maskNum = 0;//带口罩的总数
+
+
+                if (!StringUtils.isEmpty(ids)) {
+                    String[] allid = ids.split(",");
+                    for (int i = 0; i < allid.length; i++) {
+                        Integer id = Integer.valueOf(allid[i]);
+                        CenterMask data = map.getOrDefault(id, new CenterMask());
+                        //查询单个 摄像头 id
+                        if (null != data.getMaskFace()) {
+                            maskNum = maskNum + data.getMaskFace();
+                        }
+                        if (null != data.getTotalFace()) {
+                            totalNum = totalNum + data.getTotalFace();
+                        }
+                    }
+                    alltotalNum += totalNum;
+                    allmaskNum += maskNum;
+                    // 计算总比例
+                    if (totalNum > 0) {
+                        BigDecimal totalMaskProportion = new BigDecimal(maskNum).multiply(new BigDecimal(100))
+                                .divide(new BigDecimal(totalNum), BigDecimal.ROUND_HALF_UP);
+                        value = totalMaskProportion.intValue();
+                    }
+                }
+                msk.setLabel(areaName);
+                msk.setValue(value);
+                reList.add(msk);
+            }
+        }
+
+        List<CenterMaskPojo> flaList = new ArrayList<CenterMaskPojo>();
+        //统计总的数据
+        String allLabel = search.getAllLabel();
+        if (!StringUtils.isEmpty(allLabel)) {
+            CenterMaskPojo mask = new CenterMaskPojo();
+            Integer value = 0;
+            if (alltotalNum > 0) {
+                // 计算总比例
+                BigDecimal totalMaskProportion = new BigDecimal(allmaskNum).multiply(new BigDecimal(100))
+                        .divide(new BigDecimal(alltotalNum), BigDecimal.ROUND_HALF_UP);
+                value = totalMaskProportion.intValue();
+            }
+            mask.setLabel(allLabel);
+            mask.setValue(value);
+            flaList.add(mask);
+        }
+
+        //循环reList 排序
+
+        Collections.sort(reList, new Comparator<CenterMaskPojo>() {
+
+            @Override
+            public int compare(CenterMaskPojo o1, CenterMaskPojo o2) {
+                if (o1.getValue() > o2.getValue()) {
+                    return -1;
+                }
+                if (o1.getValue() == o2.getValue()) {
+                    return 0;
+                }
+                return 1;
+            }
+
         });
 
-        // 计算总比例
+        for (CenterMaskPojo deData : reList) {
+            flaList.add(deData);
+        }
 
-
-        // 根据口罩指数排序
-        // 取前3
-        // 并转为List
-        List<CenterMaskPojo> list = map.entrySet().stream()
-                .sorted(Map.Entry.comparingByValue())
-                .limit(3)
-                .map(e -> {
-                    CenterMaskPojo pojo = new CenterMaskPojo();
-                    pojo.setId(e.getValue().getCameraId());
-                    pojo.setValue(e.getValue().getMaskProportion());
-                    return pojo;
-                })
-                .collect(Collectors.toList());
-
-        CenterMaskPojo pojo = new CenterMaskPojo();
-        pojo.setId(0);
-        pojo.setValue(totalMaskProportion.intValue());
-        list.add(pojo);
-        // 结果翻转
-        Collections.reverse(list);
 
         // TODO 将结果缓存
-        return list;
+        return flaList;
     }
 
-    /** 缓存当前时间戳 */
+    /**
+     * 缓存当前时间戳
+     */
     private void updateCacheTime(Long milli) {
         // 缓存数据
         Query updateQuery = new Query();

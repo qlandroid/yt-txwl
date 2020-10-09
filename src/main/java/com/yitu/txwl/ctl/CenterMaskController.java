@@ -1,14 +1,20 @@
 package com.yitu.txwl.ctl;
 
 import com.yitu.txwl.pojo.CenterMaskPojo;
+import com.yitu.txwl.pojo.CenterMaskSearch;
 import com.yitu.txwl.service.mask.CenterMaskService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpRequest;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -32,9 +38,10 @@ public class CenterMaskController {
      * @author WJ
      * @date   2020-09-19 22:25:05
      */
-    @GetMapping("/maskProportion")
-    public List<CenterMaskPojo> listTop4MaskProportion() {
-        return centerMaskService.getCenterMaskData();
+    @RequestMapping(value = "/maskProportion", method = RequestMethod.POST)
+    public List<CenterMaskPojo> listTop4MaskProportion(@RequestBody CenterMaskSearch search) {
+        return centerMaskService.getCenterMaskData(search);
     }
+
 
 }

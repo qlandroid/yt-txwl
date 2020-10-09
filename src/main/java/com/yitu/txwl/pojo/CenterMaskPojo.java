@@ -17,8 +17,29 @@ public class CenterMaskPojo {
     private String label;
     /** 比例(整数) */
     private Integer value;
+    
+    private String areaName;
+    
+    private String ids;
+    
 
-    public Integer getId() {
+    public String getAreaName() {
+		return areaName;
+	}
+
+	public void setAreaName(String areaName) {
+		this.areaName = areaName;
+	}
+
+	public String getIds() {
+		return ids;
+	}
+
+	public void setIds(String ids) {
+		this.ids = ids;
+	}
+
+	public Integer getId() {
         return id;
     }
 

@@ -1,16 +1,16 @@
 package com.yitu.txwl.ctl;
 
 import com.yitu.txwl.pojo.CenterEnterPojo;
+import com.yitu.txwl.pojo.EnterTimeAreaPojo;
 import com.yitu.txwl.service.device.CenterEnterService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedList;
+import java.util.List;
 
 /**
  * 会展中心摄像头数据(模块3)
@@ -36,9 +36,9 @@ public class CenterEnterController {
      * @author WJ
      * @date 2020-09-19 22:25:05
      */
-    @GetMapping("/centerStatistics")
-    public LinkedList<CenterEnterPojo> listAllDevice() {
-        return centerEnterService.listAllDevice();
+    @PostMapping("/centerStatistics")
+    public LinkedList<CenterEnterPojo> listAllDevice(@RequestBody List<EnterTimeAreaPojo> list) {
+        return centerEnterService.listAllDevice(list);
     }
 
     @GetMapping("/update")

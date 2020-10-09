@@ -1,6 +1,7 @@
 package com.yitu.txwl.service.mask;
 
 import com.yitu.txwl.pojo.CenterMaskPojo;
+import com.yitu.txwl.pojo.CenterMaskSearch;
 
 import java.util.List;
 
@@ -21,5 +22,5 @@ public interface CenterMaskService {
      */
     void execFetchTrackMeta();
 
-    List<CenterMaskPojo> getCenterMaskData();
+    List<CenterMaskPojo> getCenterMaskData(CenterMaskSearch search);
 }
